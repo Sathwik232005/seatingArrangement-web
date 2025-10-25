@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Command Console</title>
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. Papa Parse (for CSV handling) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    
+    <style>
+        /* Base Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Page container styles */
+        .page {
+            display: none; /* All pages are hidden by default */
+        }
+        .page.active {
+            display: block; /* The active page is shown */
+        }
+        
+        /* Custom styles for the generated seating chart */
+        .desk {
+            width: 60px;
+            height: 40px;
+            border: 2px solid #cbd5e1; /* slate-300 */
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-size: 10px;
+            font-weight: 600;
+            background-color: white;
+            cursor: move;
+            transition: all 0.2s ease-in-out;
+        }
+        .desk.occupied {
+            background-color: #f0f9ff; /* sky-50 */
+            border-color: #38bdf8; /* sky-400 */
+        }
+        .desk.occupied.conflict {
+            background-color: #fff1f2; /* rose-50 */
+            border-color: #f43f5e; /* rose-500 */
+        }
+        .desk:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        /* Hide default file input */
+        input[type="file"] {
+            display: none;
+        }
+        /* Style custom file upload button */
+        .custom-file-upload {
+             display: inline-block;
+             cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+
+    <!-- This is the main container for our single-page app -->
+    <div id="app-container">
+
+        <!-- 
+        ============================================================
+        PAGE 1: LOGIN PAGE (The default active page)
+        ============================================================
+        -->
+        <div id="page-login" class="page active">
+            <div class="flex min-h-screen items-center justify-center bg-gray-100">
+                <div class="w-full max-w-md rounded-lg bg-white p-8 shadow-xl">
+                    <div class="flex justify-center">
+                        <!-- Icon: University -->
+                        <svg data-lucide="school" class="h-16 w-16 text-blue-600" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><path d="M18 10v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><path d="M6 10V6a2 2 0 0 1 2-2v0a2 2 0 0 1 2 2v4"/><path d="M6 14v-4"/><path d="M18 14v-4"/><path d="M12 18V6"/><path d="M6 18v-2a2 2 0 0 1 2-2v0a2 2 0 0 1 2 2v2"/><path d="M18 18v-2a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="m22 10-10-6-10 6"/><path d="M6 18v4"/><path d="M18 18v4"/></svg>
+                    </div>
+                    <h2 class="mt-4 text-center text-3xl font-bold tracking-tight text-gray-900">
+                        Exam Command Console
+                    </h2>
+                    
+                    <!-- Login/Signup Toggle -->
+                    <div class="mt-4 flex justify-center rounded-md bg-gray-100 p-1">
+                        <button id="btn-show-login" class="w-1/2 rounded-md bg-white py-2 text-sm font-semibold text-blue-600 shadow">Login</button>
+                        <button id="btn-show-signup" class="w-1/2 rounded-md py-2 text-sm font-semibold text-gray-700">Sign Up</button>
+                    </div>
+
+                    <!-- Error Message Box -->
+                    <div id="auth-error" class="mt-4 hidden rounded-md bg-red-50 p-3 text-center text-sm font-medium text-red-700">
+                        Error message goes here
+                    </div>
+
+                    <!-- Login Form -->
+                    <form id="login-form" class="mt-6 space-y-6">
+                        <input type="hidden" name="remember" value="true">
+                        <div>
+                            <label for="login-email" class="block text-sm font-medium text-gray-700">Email address</label>
+                            <input id="login-email" name="email" type="email" autocomplete="email" required class="mt-1 block w-full rounded-md border border-gray-300 p-3 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="login-password" class="block text-sm font-medium text-gray-700">Password</label>
+                            <input id="login-password" name="password" type="password" autocomplete="current-password" required class="mt-1 block w-full rounded-md border border-gray-300 p-3 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <button type="submit" class="flex w-full justify-center rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                <span id="login-spinner" class="hidden h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                                <span id="login-text">Sign In</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Sign Up Form (hidden by default) -->
+                    <form id="signup-form" class="mt-6 hidden space-y-6">
+                        <div>
+                            <label for="signup-email" class="block text-sm font-medium text-gray-700">Email address</label>
+                            <input id="signup-email" name="email" type="email" autocomplete="email" required class="mt-1 block w-full rounded-md border border-gray-300 p-3 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="signup-password" class="block text-sm font-medium text-gray-700">Password</label>
+                            <input id="signup-password" name="password" type="password" autocomplete="new-password" required class="mt-1 block w-full rounded-md border border-gray-300 p-3 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="signup-role" class="block text-sm font-medium text-gray-700">Your Role</label>
+                            <select id="signup-role" name="role" required class="mt-1 block w-full rounded-md border border-gray-300 bg-white p-3 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="student">Student</option>
+                                <option value="invigilator">Invigilator</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                        </div>
+                        <div>
+                            <button type="submit" class="flex w-full justify-center rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                                <span id="signup-spinner" class="hidden h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                                <span id="signup-text">Create Account</span>
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+        ============================================================
+        PAGE 2: ADMIN DASHBOARD (Hidden by default)
+        ============================================================
+        -->
+        <div id="page-admin-dashboard" class="page">
+            <div class="flex min-h-screen">
+                <!-- Sidebar -->
+                <nav class="flex w-64 flex-col bg-gray-800 text-gray-100">
+                    <div class="flex items-center space-x-2 border-b border-gray-700 p-4">
+                        <svg data-lucide="shield-check" class="h-8 w-8 text-blue-400" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+                        <span class="text-xl font-semibold">Admin Console</span>
+                    </div>
+                    <div class="flex-1 space-y-2 p-4">
+                        <a href="#" class="admin-nav-link active flex items-center space-x-3 rounded-md bg-gray-900 p-3" data-page="admin-page-dashboard">
+                            <svg data-lucide="layout-dashboard" class="h-5 w-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+                            <span>Dashboard</span>
+                        </a>
+                        <a href="#" class="admin-nav-link flex items-center space-x-3 rounded-md p-3 hover:bg-gray-700" data-page="admin-page-data">
+                            <svg data-lucide="database" class="h-5 w-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                            <span>Data Management</span>
+                        </a>
+                        <a href="#" class="admin-nav-link flex items-center space-x-3 rounded-md p-3 hover:bg-gray-700" data-page="admin-page-generate">
+                            <svg data-lucide="play" class="h-5 w-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="m5 3 14 9-14 9V3z"/></svg>
+                            <span>Generate Plan</span>
+                        </a>
+                        <a href="#" class="admin-nav-link flex items-center space-x-3 rounded-md p-3 hover:bg-gray-700" data-page="admin-page-reports">
+                            <svg data-lucide="file-text" class="h-5 w-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+                            <span>View Reports</span>
+                        </a>
+                    </div>
+                    <div class="border-t border-gray-700 p-4">
+                        <div id="user-email-display" class="text-sm text-gray-400">Loading...</div>
+                        <button id="btn-logout-admin" class="mt-2 flex w-full items-center space-x-2 rounded-md p-2 text-left text-sm text-red-400 hover:bg-red-500 hover:text-white">
+                            <svg data-lucide="log-out" class="h-5 w-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </nav>
+
+                <!-- Main Content Area -->
+                <main class="flex-1 bg-gray-100 p-8">
+                    
+                    <!-- Admin Sub-Page: Dashboard -->
+                    <div id="admin-page-dashboard" class="admin-page active">
+                        <h1 class="text-3xl font-bold text-gray-900">Welcome, Administrator</h1>
+                        <p class="mt-2 text-lg text-gray-600">Here's a quick overview of the upcoming exam session.</p>
+                        
+                        <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                            <!-- Stat Card 1 -->
+                            <div class="rounded-lg bg-white p-6 shadow-md">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500">Total Students</p>
+                                        <p id="stat-students" class="text-3xl font-bold text-gray-900">0</p>
+                                    </div>
+                                    <div class="rounded-full bg-blue-100 p-3">
+                                        <svg data-lucide="users" class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Stat Card 2 -->
+                            <div class="rounded-lg bg-white p-6 shadow-md">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500">Total Rooms</p>
+                                        <p id="stat-rooms" class="text-3xl font-bold text-gray-900">0</p>
+                                    </div>
+                                    <div class="rounded-full bg-green-100 p-3">
+                                        <svg data-lucide="school-2" class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="m18 5-6-3-6 3"/><path d="m6 5 6 3 6-3"/><path d="M2 12h20"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Stat Card 3 -->
+                            <div class="rounded-lg bg-white p-6 shadow-md">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500">Total Exams</p>
+                                        <p id="stat-exams" class="text-3xl font-bold text-gray-900">0</p>
+                                    </div>
+                                    <div class="rounded-full bg-yellow-100 p-3">
+                                        <svg data-lucide="book-open" class="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Stat Card 4 -->
+                            <div class="rounded-lg bg-white p-6 shadow-md">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500">Generated Plans</p>
+                                        <p id="stat-plans" class="text-3xl font-bold text-gray-900">0</p>
+                                    </div>
+                                    <div class="rounded-full bg-purple-100 p-3">
+                                        <svg data-lucide="check-check" class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Sub-Page: Data Management -->
+                    <div id="admin-page-data" class="admin-page hidden">
+                        <h1 class="text-3xl font-bold text-gray-900">Data Management</h1>
+                        <p class="mt-2 text-lg text-gray-600">Upload CSV files for students, rooms, and exams.</p>
+
+                        <div class="mt-6 space-y-8">
+                            <!-- Section: Students -->
+                            <div class="rounded-lg bg-white p-6 shadow-md">
+                                <h2 class="text-xl font-semibold text-gray-800">1. Student Data</h2>
+                                <p class="mt-1 text-sm text-gray-500">CSV columns: `id`, `name`, `subjects` (e.g., "CS101,PHY204").</p>
+                                <div class="mt-4 flex items-center space-x-2">
+                                    <label for="student-file" class="custom-file-upload rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                                        Upload Students CSV
+                                    </label>
+                                    <input type="file" id="student-file" accept=".csv">
+                                    <span id="student-file-status" class="text-sm text-gray-500">No file selected.</span>
+                                </div>
+                                <div class="mt-4">
+                                    <label class="block text-sm font-medium text-gray-700">Student Accommodations (Handled Separately)</label>
+                                    <p class="text-xs text-gray-500">This feature would require a more complex implementation.</p>
+                                    <input type="text" class="mt-1 block w-full max-w-md rounded-md border-gray-300 bg-gray-100 shadow-sm" value="FRONT_ROW, WHEELCHAIR_ACCESS, ISOLATION" disabled>
+                                </div>
+                            </div>
+
+                            <!-- Section: Rooms -->
+                            <div class="rounded-lg bg-white p-6 shadow-md">
+                                <h2 class="text-xl font-semibold text-gray-800">2. Room Data</h2>
+                                <p class="mt-1 text-sm text-gray-500">CSV columns: `id`, `capacity` (number), `rows` (number), `cols` (number).</p>
+                                <div class="mt-4 flex items-center space-x-2">
+                                     <label for="room-file" class="custom-file-upload rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                                        Upload Rooms CSV
+                                    </label>
+                                    <input type="file" id="room-file" accept=".csv">
+                                    <span id="room-file-status" class="text-sm text-gray-500">No file selected.</span>
+                                </div>
+                                <div class="mt-4">
+                                    <label class="block text-sm font-medium text-gray-700">Room Types (Handled Separately)</label>
+                                     <p class="text-xs text-gray-500">This feature would require a more complex implementation.</p>
+                                    <input type="text" class="mt-1 block w-full max-w-md rounded-md border-gray-300 bg-gray-100 shadow-sm" value="STANDARD, WHEELCHAIR_ACCESSIBLE, ISOLATION_ROOM" disabled>
+                                </div>
+                            </div>
+                            
+                            <!-- Section: Exams & Sessions -->
+                            <div class="rounded-lg bg-white p-6 shadow-md">
+                                <h2 class="text-xl font-semibold text-gray-800">3. Exam & Session Data</h2>
+                                <p class="mt-1 text-sm text-gray-500">CSV columns: `subject`, `session` (e.g., "Morning_Oct_25").</p>
+                                <div class="mt-4 flex items-center space-x-2">
+                                     <label for="exam-file" class="custom-file-upload rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                                        Upload Exams CSV
+                                    </label>
+                                    <input type="file" id="exam-file" accept=".csv">
+                                    <span id="exam-file-status" class="text-sm text-gray-500">No file selected.</span>
+                                </div>
+                                <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Exam Sessions (Info)</label>
+                                        <p class="text-xs text-gray-500">Defined within the uploaded exam data.</p>
+                                        <input type="text" class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm" value="Morning_Oct_25, Afternoon_Oct_25" disabled>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Session Times (Info)</label>
+                                        <p class="text-xs text-gray-500">Example times.</p>
+                                        <input type="text" class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm" value="09:00_AM, 02:00_PM" disabled>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Sub-Page: Generate Plan -->
+                    <div id="admin-page-generate" class="admin-page hidden">
+                        <h1 class="text-3xl font-bold text-gray-900">Generate Seating Plan</h1>
+                        <p class="mt-2 text-lg text-gray-600">Run the basic planner using the uploaded data.</p>
+                        
+                        <div class="mt-6 rounded-lg bg-white p-6 shadow-md">
+                            <div class="max-w-xl">
+                                <label for="session-select" class="block text-sm font-medium text-gray-700">1. Select Exam Session to Plan</label>
+                                <!-- Session options will be populated dynamically -->
+                                <select id="session-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                    <option value="">-- Upload Exam Data First --</option> 
+                                </select>
+
+                                <p class="mt-6 text-sm font-medium text-gray-700">2. Run the Basic Planner</p>
+                                <p class="mt-1 text-sm text-gray-500">This will use the uploaded student, room, and exam data to generate a plan and save it to Firestore.</p>
+                                <button id="btn-run-planner" class="mt-4 flex items-center justify-center rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-md hover:bg-green-700 disabled:opacity-50" disabled>
+                                    <svg data-lucide="play" class="mr-2 h-5 w-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="m5 3 14 9-14 9V3z"/></svg>
+                                    Run Basic Planner
+                                </button>
+                                 <p class="mt-1 text-xs text-gray-500">Requires all three CSV files to be uploaded successfully.</p>
+
+
+                                <!-- Planner Status -->
+                                <div id="planner-status" class="mt-6 hidden">
+                                    <!-- Loading Spinner -->
+                                    <div id="planner-loading" class="hidden items-center">
+                                        <div class="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+                                        <span id="planner-message" class="ml-3 font-medium text-gray-700">Generating plan...</span>
+                                    </div>
+                                    <!-- Success Message -->
+                                    <div id="planner-success" class="mt-4 hidden rounded-md bg-green-50 p-4">
+                                        <h3 class="text-sm font-medium text-green-800">Success!</h3>
+                                        <p id="planner-success-message" class="mt-2 text-sm text-green-700">Plan generated and saved to database.</p>
+                                    </div>
+                                    <!-- Error Message -->
+                                    <div id="planner-error" class="mt-4 hidden rounded-md bg-red-50 p-4">
+                                         <h3 class="text-sm font-medium text-red-800">Error!</h3>
+                                        <p id="planner-error-message" class="mt-2 text-sm text-red-700">Could not generate plan.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- "What-If" Sandbox (Demo) -->
+                        <div class="mt-8 opacity-50"> 
+                            <h2 class="text-2xl font-bold text-gray-900">"What-If" Sandbox (Demo)</h2>
+                            <p class="mt-2 text-base text-gray-600">This demo uses sample data, not the generated plan.</p>
+                            
+                            <div class="mt-4 rounded-lg bg-white p-6 shadow-md">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-lg font-semibold">Room 201 (Sample)</h3>
+                                    <div>
+                                        <span class="text-sm font-medium text-gray-600">Integrity Score: </span>
+                                        <span id="integrity-score" class="text-2xl font-bold text-green-600">92%</span>
+                                    </div>
+                                </div>
+                                <div id="seating-chart-container" class="mt-4 grid grid-cols-5 gap-4 rounded-md border-2 border-dashed border-gray-300 bg-gray-50 p-4">
+                                    <!-- Desks will be dynamically generated here by JavaScript -->
+                                </div>
+                                
+                                <div id="student-info-box" class="mt-4 hidden rounded-lg bg-blue-50 p-4">
+                                    <h4 class="font-bold text-blue-800">Student Placement Info ("Glass Box")</h4>
+                                    <p id="student-info-text" class="mt-2 text-sm text-blue-700"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Admin Sub-Page: View Reports -->
+                    <div id="admin-page-reports" class="admin-page hidden">
+                        <h1 class="text-3xl font-bold text-gray-900">View & Export Reports</h1>
+                        <p class="mt-2 text-lg text-gray-600">View plans saved in Firestore and export them as CSV.</p>
+
+                        <div class="mt-6 rounded-lg bg-white p-6 shadow-md">
+                            <h2 class="text-xl font-semibold text-gray-800">Generated Reports from Firestore</h2>
+                             <button id="btn-fetch-plans" class="mt-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">Fetch Saved Plans</button>
+                            <div id="reports-loading" class="mt-4 hidden">Loading plans...</div>
+                            <div id="reports-list" class="mt-4 space-y-3">
+                                <!-- Reports will be loaded here -->
+                                <p class="text-sm text-gray-500">No plans fetched yet.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </main>
+            </div>
+        </div>
+
+        <!-- 
+        ============================================================
+        PAGE 3: INVIGILATOR DASHBOARD (Hidden by default)
+        ============================================================
+        -->
+        <div id="page-invigilator-dashboard" class="page">
+             <nav class="flex items-center justify-between bg-white p-4 shadow-md">
+                <div class="flex items-center space-x-2">
+                    <svg data-lucide="eye" class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <span class="text-xl font-semibold text-gray-800">Invigilator Portal</span>
+                </div>
+                <div>
+                    <span id="user-email-display-invig" class="mr-4 text-sm text-gray-600"></span>
+                    <button id="btn-logout-invig" class="rounded-md bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600">
+                        Logout
+                    </button>
+                </div>
+            </nav>
+            <main class="p-8">
+                <h1 class="text-3xl font-bold text-gray-900">Your Assignments</h1>
+                <p class="mt-2 text-lg text-gray-600">Functionality not implemented in this version.</p>
+                <!-- Simplified content for Invigilator -->
+            </main>
+        </div>
+        
+        <!-- 
+        ============================================================
+        PAGE 4: STUDENT DASHBOARD (Hidden by default)
+        ============================================================
+        -->
+        <div id="page-student-dashboard" class="page">
+            <nav class="flex items-center justify-between bg-white p-4 shadow-md">
+                <div class="flex items-center space-x-2">
+                    <svg data-lucide="user" class="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span class="text-xl font-semibold text-gray-800">Student Portal</span>
+                </div>
+                <div>
+                    <span id="user-email-display-student" class="mr-4 text-sm text-gray-600"></span>
+                    <button id="btn-logout-student" class="rounded-md bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600">
+                        Logout
+                    </button>
+                </div>
+            </nav>
+            <main class="p-8">
+                <h1 class="text-3xl font-bold text-gray-900">Your Hall Ticket</h1>
+                 <p class="mt-2 text-lg text-gray-600">Functionality not implemented in this version.</p>
+                 <!-- Simplified content for Student -->
+            </main>
+        </div>
+
+    </div> <!-- End #app-container -->
+
+
+    <!-- 
+    ============================================================
+    JAVASCRIPT (All our logic + Firebase)
+    ============================================================
+    -->
+    <!-- Load Lucide Icons Script at the end of body -->
+    <script src="https://unpkg.com/lucide-icons"></script> 
+    
+    <script type="module">
+        // --- 3. FIREBASE SDK IMPORTS ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            onAuthStateChanged, 
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            setDoc, 
+            getDoc,
+            addDoc,
+            collection,
+            query,
+            getDocs // Added for fetching plans
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; 
+        
+        // --- 4. FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyCe0Y-EHnQoKVdhfWFEzOkUeKrytflCokI", 
+          authDomain: "my-exam-project-3a1f6.firebaseapp.com", 
+          projectId: "my-exam-project-3a1f6", 
+          storageBucket: "my-exam-project-3a1f6.firebasestorage.app", 
+          messagingSenderId: "982368272465", 
+          appId: "1:982368272465:web:1d168ebb500d47dc6cf870", 
+          measurementId: "G-P7LRPW8EP0" 
+        };
+        // (Make sure your real keys are pasted above)
+        
+        // --- 5. INITIALIZE FIREBASE ---
+        const appId = firebaseConfig.projectId || 'default-app-id';
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        console.log("Firebase Initialized with Project ID:", appId);
+
+        // --- 6. GLOBAL VARIABLES ---
+        
+        // Data Storage
+        let uploadedStudents = [];
+        let uploadedRooms = [];
+        let uploadedExams = [];
+
+        // Page Containers
+        const pages = {
+            'login': document.getElementById('page-login'),
+            'admin': document.getElementById('page-admin-dashboard'),
+            'invigilator': document.getElementById('page-invigilator-dashboard'),
+            'student': document.getElementById('page-student-dashboard')
+        };
+        
+        // Auth Forms & Elements
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const btnShowLogin = document.getElementById('btn-show-login');
+        const btnShowSignup = document.getElementById('btn-show-signup');
+        const authError = document.getElementById('auth-error');
+        const loginSpinner = document.getElementById('login-spinner');
+        const loginText = document.getElementById('login-text');
+        const signupSpinner = document.getElementById('signup-spinner');
+        const signupText = document.getElementById('signup-text');
+        
+        // Logout Buttons
+        const logoutButtons = [
+            document.getElementById('btn-logout-admin'),
+            document.getElementById('btn-logout-invig'),
+            document.getElementById('btn-logout-student')
+        ].filter(Boolean); 
+        
+        // Admin Page Elements
+        const adminNavLinks = document.querySelectorAll('.admin-nav-link');
+        const adminPages = document.querySelectorAll('.admin-page');
+        
+        // Data Management Elements
+        const studentFileInput = document.getElementById('student-file');
+        const studentFileStatus = document.getElementById('student-file-status');
+        const roomFileInput = document.getElementById('room-file');
+        const roomFileStatus = document.getElementById('room-file-status');
+        const examFileInput = document.getElementById('exam-file');
+        const examFileStatus = document.getElementById('exam-file-status');
+
+        // Dashboard Stats
+        const statStudents = document.getElementById('stat-students');
+        const statRooms = document.getElementById('stat-rooms');
+        const statExams = document.getElementById('stat-exams');
+        const statPlans = document.getElementById('stat-plans');
+
+        // Planner Elements
+        const btnRunPlanner = document.getElementById('btn-run-planner');
+        const sessionSelect = document.getElementById('session-select');
+        const plannerStatus = document.getElementById('planner-status');
+        const plannerLoading = document.getElementById('planner-loading'); 
+        const plannerMessage = document.getElementById('planner-message');
+        const plannerSuccess = document.getElementById('planner-success');
+        const plannerSuccessMessage = document.getElementById('planner-success-message');
+        const plannerError = document.getElementById('planner-error');
+        const plannerErrorMessage = document.getElementById('planner-error-message');
+        
+        // Reports Elements
+        const btnFetchPlans = document.getElementById('btn-fetch-plans');
+        const reportsLoading = document.getElementById('reports-loading');
+        const reportsList = document.getElementById('reports-list');
+
+        // "What-If" Sandbox Elements (Demo Only)
+        const seatingChartContainer = document.getElementById('seating-chart-container');
+        const integrityScoreEl = document.getElementById('integrity-score');
+        const studentInfoBox = document.getElementById('student-info-box');
+        const studentInfoText = document.getElementById('student-info-text');
+
+        // User Email Displays
+        const userEmailDisplays = {
+            admin: document.getElementById('user-email-display'),
+            invigilator: document.getElementById('user-email-display-invig'),
+            student: document.getElementById('user-email-display-student')
+        };
+        
+        // --- 7. HELPER FUNCTIONS ---
+
+        function showPage(pageId) { 
+             console.log("Showing page:", pageId);
+            for (const id in pages) {
+                if (pages[id]) { 
+                    if (id === pageId) {
+                        pages[id].classList.add('active');
+                    } else {
+                        pages[id].classList.remove('active');
+                    }
+                }
+            }
+        }
+        function showAuthError(message) {
+            authError.textContent = message;
+            authError.classList.remove('hidden');
+         }
+        function hideAuthError() {
+             authError.classList.add('hidden');
+         }
+        function toggleAuthForms(showLogin) { 
+            if (showLogin) {
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                btnShowLogin.classList.add('bg-white', 'shadow', 'text-blue-600');
+                btnShowLogin.classList.remove('text-gray-700');
+                btnShowSignup.classList.remove('bg-white', 'shadow', 'text-blue-600');
+                btnShowSignup.classList.add('text-gray-700');
+            } else {
+                loginForm.classList.add('hidden');
+                signupForm.classList.remove('hidden');
+                btnShowLogin.classList.remove('bg-white', 'shadow', 'text-blue-600');
+                btnShowLogin.classList.add('text-gray-700');
+                btnShowSignup.classList.add('bg-white', 'shadow', 'text-blue-600');
+                btnShowSignup.classList.remove('text-gray-700');
+            }
+            hideAuthError();
+        }
+        function setAuthLoading(form, isLoading) {
+             if (form === 'login') {
+                loginSpinner.classList.toggle('hidden', !isLoading);
+                loginText.classList.toggle('hidden', isLoading);
+            } else {
+                signupSpinner.classList.toggle('hidden', !isLoading);
+                signupText.classList.toggle('hidden', isLoading);
+            }
+        }
+        function generateSeatNames(rows, cols) { 
+            const seats = [];
+            for (let r = 0; r < rows; r++) {
+                const rowLetter = String.fromCharCode(65 + r); // A, B, C...
+                for (let c = 1; c <= cols; c++) {
+                    seats.push(`${rowLetter}${c}`);
+                }
+            }
+            return seats;
+        }
+
+        // --- 7.5 CSV PARSING AND EXPORT (NEW) ---
+
+        /**
+         * Takes an array of objects and converts it to a CSV string.
+         */
+        function convertArrayToCSV(data) {
+            if (!data || data.length === 0) {
+                return "";
+            }
+            
+            const headers = Object.keys(data[0]);
+            const csvRows = [headers.join(',')]; // Header row
+
+            for (const row of data) {
+                const values = headers.map(header => {
+                    let value = row[header];
+                    if (value === null || value === undefined) {
+                        value = "";
+                    } else if (typeof value === 'string' && value.includes(',')) {
+                        // Handle values with commas by wrapping in double quotes
+                        value = `"${value}"`;
+                    }
+                    return value;
+                });
+                csvRows.push(values.join(','));
+            }
+            return csvRows.join('\n');
+        }
+
+        /**
+         * Triggers a browser download for a CSV string.
+         */
+        function exportToCSV(csvString, filename) {
+            if (!csvString) return;
+
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            
+            if (link.download !== undefined) { // Check for download attribute
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        /**
+         * Handles the file upload and parsing using PapaParse.
+         */
+        function handleFileUpload(fileInput, statusElement, dataTarget) {
+            const file = fileInput.files[0];
+            if (!file) {
+                statusElement.textContent = "No file selected.";
+                statusElement.classList.remove('text-green-600', 'text-red-600');
+                statusElement.classList.add('text-gray-500');
+                checkAllFilesUploaded(); 
+                return;
+            }
+
+            statusElement.textContent = "Parsing...";
+            statusElement.classList.remove('text-gray-500', 'text-red-600');
+            statusElement.classList.add('text-blue-600');
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: true, 
+                complete: function(results) {
+                    console.log(`Parsed ${dataTarget} data:`, results.data);
+                    
+                    if (dataTarget === 'students') {
+                        results.data.forEach(student => {
+                            if (student.subjects && typeof student.subjects === 'string') {
+                                student.subjects = student.subjects.split(',').map(s => s.trim());
+                            } else if (student.subjects) {
+                                student.subjects = [String(student.subjects)];
+                            } else {
+                                student.subjects = []; 
+                            }
+                        });
+                        uploadedStudents = results.data;
+                    }
+                    else if (dataTarget === 'rooms') uploadedRooms = results.data;
+                    else if (dataTarget === 'exams') {
+                         uploadedExams = results.data;
+                         populateSessionSelect(); 
+                    }
+
+                    statusElement.textContent = `Success! ${results.data.length} records loaded.`;
+                    statusElement.classList.remove('text-blue-600', 'text-red-600');
+                    statusElement.classList.add('text-green-600');
+                    updateDashboardStats(); 
+                    checkAllFilesUploaded(); 
+                },
+                error: function(error) {
+                    console.error(`Error parsing ${dataTarget} CSV:`, error);
+                    statusElement.textContent = `Error: ${error.message}`;
+                    statusElement.classList.remove('text-blue-600', 'text-green-600');
+                    statusElement.classList.add('text-red-600');
+                    
+                     if (dataTarget === 'students') uploadedStudents = [];
+                     else if (dataTarget === 'rooms') uploadedRooms = [];
+                     else if (dataTarget === 'exams') uploadedExams = [];
+                    updateDashboardStats();
+                    checkAllFilesUploaded(); 
+                }
+            });
+        }
+        
+        // --- 7.6 BASIC PLANNER FUNCTION ---
+        function generateBasicPlan(students, rooms, exams, sessionId) {
+            console.log("Running basic planner for session:", sessionId);
+            const plan = [];
+
+             // Basic validation
+            if (!students || students.length === 0) return { plan: [], integrityScore: 0, message: "Student data is missing or empty. Please upload students.csv." };
+            if (!rooms || rooms.length === 0) return { plan: [], integrityScore: 0, message: "Room data is missing or empty. Please upload rooms.csv." };
+            if (!exams || exams.length === 0) return { plan: [], integrityScore: 0, message: "Exam data is missing or empty. Please upload exams.csv." };
+            
+            // 1. Find subjects in session
+            const subjectsInSession = exams
+                .filter(exam => exam.session === sessionId)
+                .map(exam => exam.subject);
+            
+            if (subjectsInSession.length === 0) {
+                console.warn("No exams found for this session!");
+                return { plan: [], integrityScore: 0, message: "No exams found for this session in exams.csv." };
+            }
+            console.log("Subjects in this session:", subjectsInSession);
+            
+            // 2. Find students to seat
+            const studentsToSeat = students.filter(student => 
+                Array.isArray(student.subjects) && 
+                student.subjects.some(sub => subjectsInSession.includes(sub))
+            );
+            console.log(`Found ${studentsToSeat.length} students to seat.`);
+            
+            if (studentsToSeat.length === 0) {
+                 return { plan: [], integrityScore: 0, message: "No students found for the exams in this session. Check your students.csv." };
+            }
+
+            // 3. Prepare rooms
+            let roomAllotments = {};
+            let totalCapacity = 0;
+            rooms.forEach(room => {
+                const capacity = parseInt(room.capacity, 10);
+                const rows = parseInt(room.rows, 10);
+                const cols = parseInt(room.cols, 10);
+                 if (isNaN(capacity) || isNaN(rows) || isNaN(cols) || capacity <= 0 || rows <= 0 || cols <= 0) {
+                     console.warn("Invalid room data skipped:", room);
+                     return; 
+                 }
+
+                roomAllotments[room.id] = {
+                    id: room.id,
+                    capacity: capacity,
+                    students: [],
+                    seats: generateSeatNames(rows, cols) 
+                };
+                totalCapacity += capacity;
+            });
+            
+             if (Object.keys(roomAllotments).length === 0) {
+                 return { plan: [], integrityScore: 0, message: "No valid rooms found in rooms.csv. Check capacity, rows, and cols." };
+             }
+
+             if (studentsToSeat.length > totalCapacity) {
+                  return { plan: [], integrityScore: 0, message: `Error: Not enough capacity! ${studentsToSeat.length} students to seat but only ${totalCapacity} total seats available.` };
+             }
+
+            // 4. Assign students
+            for (const student of studentsToSeat) {
+                let assigned = false;
+                for (const roomId in roomAllotments) {
+                    const room = roomAllotments[roomId];
+                    if (room.students.length < room.capacity) {
+                        const seat = room.seats[room.students.length]; 
+                        plan.push({
+                            studentId: student.id,
+                            studentName: student.name || 'N/A', 
+                            roomId: room.id,
+                            seat: seat
+                        });
+                        room.students.push(student.id);
+                        assigned = true;
+                        break; 
+                    }
+                }
+                if (!assigned) {
+                    // This should theoretically not be hit if we check total capacity first
+                    console.error(`Could not seat student ${student.id}! No room capacity!`);
+                    return { plan, integrityScore: 0, message: `Failed: Ran out of space. Could not seat student ${student.id}.` };
+                }
+            }
+            
+            // 5. Calculate score
+            const integrityScore = Math.floor((plan.length / studentsToSeat.length) * 100); 
+            
+            console.log("Generated plan:", plan);
+            return { plan, integrityScore, message: `Successfully seated ${plan.length} out of ${studentsToSeat.length} students.` };
+        }
+
+        // --- 7.7 UI UPDATE FUNCTIONS ---
+        function updateDashboardStats() {
+            statStudents.textContent = uploadedStudents.length;
+            statRooms.textContent = uploadedRooms.length;
+            statExams.textContent = uploadedExams.length;
+        }
+
+        function populateSessionSelect() {
+            sessionSelect.innerHTML = '<option value="">-- Select Session --</option>'; // Clear existing
+            if (uploadedExams.length === 0) {
+                 sessionSelect.innerHTML = '<option value="">-- Upload Exam Data --</option>';
+                 return;
+            }
+
+            const sessions = [...new Set(uploadedExams.map(exam => exam.session))]; 
+            sessions.forEach(session => {
+                const option = document.createElement('option');
+                option.value = session;
+                option.textContent = session; 
+                sessionSelect.appendChild(option);
+            });
+        }
+
+        function checkAllFilesUploaded() {
+            const allUploaded = uploadedStudents.length > 0 && uploadedRooms.length > 0 && uploadedExams.length > 0;
+            btnRunPlanner.disabled = !allUploaded;
+             if (allUploaded) {
+                 console.log("All files uploaded, enabling planner button.");
+             } else {
+                  console.log("Waiting for all files to be uploaded.");
+             }
+             return allUploaded;
+        }
+
+        // --- 8. FIREBASE AUTH LOGIC ---
+        
+        onAuthStateChanged(auth, async (user) => { 
+              if (user) {
+                console.log("User is logged in:", user.email);
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                
+                if (userDocSnap.exists()) {
+                    const userData = userDocSnap.data();
+                    const role = userData.role;
+                    
+                    if(userEmailDisplays[role]) {
+                        userEmailDisplays[role].textContent = user.email;
+                    }
+                    
+                    if (role === 'admin') {
+                        showPage('admin');
+                        // Fetch plan count for stats
+                        try {
+                            const plansQuery = query(collection(db, `artifacts/${appId}/public/data/plans`));
+                            const plansSnapshot = await getDocs(plansQuery);
+                            statPlans.textContent = plansSnapshot.size;
+                        } catch (e) {
+                            console.error("Could not fetch plan count:", e);
+                            statPlans.textContent = "0";
+                        }
+                    } else if (role === 'invigilator') {
+                        showPage('invigilator');
+                    } else if (role === 'student') {
+                        showPage('student');
+                    } else {
+                        await signOut(auth);
+                    }
+                } else {
+                    console.error("User doc not found in Firestore!");
+                    await signOut(auth);
+                }
+            } else {
+                console.log("User is logged out.");
+                showPage('login');
+                Object.values(userEmailDisplays).forEach(el => {
+                    if (el) el.textContent = '';
+                });
+                 uploadedStudents = [];
+                 uploadedRooms = [];
+                 uploadedExams = [];
+                 updateDashboardStats();
+                 populateSessionSelect();
+                 checkAllFilesUploaded();
+                 studentFileStatus.textContent = "No file selected.";
+                 roomFileStatus.textContent = "No file selected.";
+                 examFileStatus.textContent = "No file selected.";
+                 statPlans.textContent = "0";
+            }
+        });
+        
+        loginForm.addEventListener('submit', async (e) => { 
+             e.preventDefault();
+            setAuthLoading('login', true);
+            hideAuthError();
+            const email = loginForm['login-email'].value;
+            const password = loginForm['login-password'].value;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                console.error("Login error:", error.message);
+                showAuthError(error.message);
+            }
+            setAuthLoading('login', false);
+        });
+        
+        signupForm.addEventListener('submit', async (e) => { 
+             e.preventDefault();
+            setAuthLoading('signup', true);
+            hideAuthError();
+            const email = signupForm['signup-email'].value;
+            const password = signupForm['signup-password'].value;
+            const role = signupForm['signup-role'].value;
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                const userDocRef = doc(db, "users", user.uid);
+                await setDoc(userDocRef, {
+                    email: user.email,
+                    role: role,
+                    uid: user.uid
+                });
+            } catch (error) {
+                console.error("Sign up error:", error.message);
+                showAuthError(error.message);
+            }
+            setAuthLoading('signup', false);
+        });
+
+        logoutButtons.forEach(button => { 
+            if (button) { 
+                button.addEventListener('click', async () => {
+                    await signOut(auth);
+                });
+            }
+        });
+        
+        // --- 9. APP LOGIC (ADMIN DASHBOARD) ---
+
+        adminNavLinks.forEach(link => { 
+             link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const pageId = link.dataset.page;
+                
+                adminPages.forEach(page => page.classList.add('hidden'));
+                const targetPage = document.getElementById(pageId);
+                if (targetPage) {
+                    targetPage.classList.remove('hidden');
+                }
+                
+                adminNavLinks.forEach(navLink => {
+                    navLink.classList.remove('bg-gray-900', 'active');
+                    navLink.classList.add('hover:bg-gray-700');
+                });
+                link.classList.add('bg-gray-900', 'active');
+                link.classList.remove('hover:bg-gray-700');
+            });
+        });
+
+        // Event Listeners for File Inputs
+        studentFileInput.addEventListener('change', () => handleFileUpload(studentFileInput, studentFileStatus, 'students'));
+        roomFileInput.addEventListener('change', () => handleFileUpload(roomFileInput, roomFileStatus, 'rooms'));
+        examFileInput.addEventListener('change', () => handleFileUpload(examFileInput, examFileStatus, 'exams'));
+
+        // Event Listener for "Run Basic Planner"
+        btnRunPlanner.addEventListener('click', async () => {
+            plannerStatus.classList.remove('hidden');
+            plannerSuccess.classList.add('hidden');
+            plannerError.classList.add('hidden'); 
+            plannerLoading.classList.remove('hidden'); 
+            plannerMessage.textContent = "Generating plan using uploaded data...";
+            btnRunPlanner.disabled = true;
+            
+            const sessionId = sessionSelect.value;
+            if (!sessionId) {
+                 plannerLoading.classList.add('hidden');
+                 plannerError.classList.remove('hidden');
+                 plannerErrorMessage.textContent = "No session selected. Please select a session from the dropdown.";
+                 btnRunPlanner.disabled = !checkAllFilesUploaded(); 
+                 return;
+            }
+            
+            setTimeout(async () => {
+                try {
+                    const { plan, integrityScore, message } = generateBasicPlan(uploadedStudents, uploadedRooms, uploadedExams, sessionId);
+                
+                    if (plan.length === 0) {
+                        throw new Error(message || "No students were seated.");
+                    }
+                    
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/plans`), {
+                        sessionId: sessionId,
+                        generatedAt: new Date(),
+                        integrityScore: integrityScore,
+                        roomAllotments: plan 
+                    });
+                    
+                    console.log("Plan saved to Firestore with ID:", docRef.id);
+                    
+                    plannerLoading.classList.add('hidden');
+                    plannerSuccessMessage.textContent = `${message} Plan saved to database with ID: ${docRef.id}.`;
+                    plannerSuccess.classList.remove('hidden');
+                    
+                    const plansQuery = query(collection(db, `artifacts/${appId}/public/data/plans`));
+                    const plansSnapshot = await getDocs(plansQuery);
+                    statPlans.textContent = plansSnapshot.size;
+
+                } catch (error) {
+                    console.error("Error generating or saving plan:", error);
+                    plannerLoading.classList.add('hidden');
+                    plannerErrorMessage.textContent = error.message;
+                    plannerError.classList.remove('hidden'); 
+                }
+                
+                btnRunPlanner.disabled = !checkAllFilesUploaded();
+            }, 50); 
+        });
+
+        // Event Listener for Fetching Plans
+        btnFetchPlans.addEventListener('click', async () => { 
+             reportsLoading.classList.remove('hidden');
+             reportsList.innerHTML = ''; 
+
+             try {
+                const plansRef = collection(db, `artifacts/${appId}/public/data/plans`);
+                const q = query(plansRef); 
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    reportsList.innerHTML = '<p class="text-sm text-gray-500">No plans found in the database.</p>';
+                } else {
+                    let planCount = 0;
+                    querySnapshot.forEach((doc) => {
+                        planCount++;
+                        const planData = doc.data();
+                        const planId = doc.id;
+                        const reportDiv = document.createElement('div');
+                        reportDiv.className = 'flex items-center justify-between rounded-md border border-gray-200 p-4';
+                        
+                        // **MODIFICATION: Added data-session and changed button**
+                        reportDiv.innerHTML = `
+                             <div>
+                                <h3 class="font-medium text-gray-800">Plan for ${planData.sessionId || 'N/A'}</h3>
+                                <p class="text-sm text-gray-500">ID: ${planId.substring(0, 8)}...</p>
+                                <p class="text-sm text-gray-500">Generated: ${planData.generatedAt ? planData.generatedAt.toDate().toLocaleString() : 'N/A'}</p>
+                                <p class="text-sm text-gray-500">Students Seated: ${planData.roomAllotments ? planData.roomAllotments.length : 0}</p>
+                             </div>
+                             <div class="space-x-2">
+                                <button class="view-plan-btn rounded-md bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-200" data-plan='${JSON.stringify(planData.roomAllotments || [])}'>View Details</button>
+                                <button class="export-csv-btn rounded-md bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700" 
+                                        data-plan='${JSON.stringify(planData.roomAllotments || [])}' 
+                                        data-session="${planData.sessionId || 'plan'}">
+                                    Export CSV
+                                </button>
+                             </div>
+                        `;
+                        reportsList.appendChild(reportDiv);
+                    });
+                     statPlans.textContent = planCount; // Update stat
+                }
+
+             } catch (error) {
+                 console.error("Error fetching plans:", error);
+                 reportsList.innerHTML = `<p class="text-sm text-red-600">Error fetching plans: ${error.message}</p>`;
+             } finally {
+                 reportsLoading.classList.add('hidden');
+             }
+        });
+
+        // **NEW: Event Delegation for Report Buttons**
+        reportsList.addEventListener('click', (e) => {
+            const target = e.target;
+            
+            // Handle "View Details" click
+            if (target.classList.contains('view-plan-btn')) {
+                const planDetails = JSON.parse(target.dataset.plan);
+                alert("Plan Details (Top 20):\n" + JSON.stringify(planDetails.slice(0, 20), null, 2) + (planDetails.length > 20 ? "\n..." : ""));
+            }
+            
+            // Handle "Export CSV" click
+            if (target.classList.contains('export-csv-btn')) {
+                const planDetails = JSON.parse(target.dataset.plan);
+                const sessionId = target.dataset.session;
+                
+                if (planDetails.length > 0) {
+                    const csvString = convertArrayToCSV(planDetails);
+                    exportToCSV(csvString, `seating_plan_${sessionId}.csv`);
+                } else {
+                    alert("No data to export.");
+                }
+            }
+        });
+
+
+        // Demo Sandbox Rendering
+        function renderSandbox() { 
+            const students = [
+                { id: "S-1001", name: "Jane D.", subject: "CS101", seat: "A-05" },
+                { id: "S-1002", name: "Mike L.", subject: "PHY204", seat: "A-06" },
+                { id: "S-1003", name: "Kim P.", subject: "CS101", seat: "B-01" },
+                { id: "S-1004", name: "Sam T.", subject: "ECO301", seat: "C-03" },
+                { id: "S-1005", name: "Li W.", subject: "PHY204", seat: "C-04" },
+            ];
+            const totalDesks = 15; // 5 cols x 3 rows
+            
+            if (!seatingChartContainer) return; 
+            
+            seatingChartContainer.innerHTML = ''; 
+            
+            for (let i = 0; i < totalDesks; i++) {
+                const desk = document.createElement('div');
+                desk.classList.add('desk');
+                desk.dataset.deskId = i;
+                
+                const student = students[i]; 
+                if (student) {
+                    desk.classList.add('occupied');
+                    desk.innerHTML = `
+                        <span class="font-bold">${student.id}</span>
+                        <span class="text-gray-600">${student.subject}</span>
+                    `;
+                    desk.dataset.studentId = student.id;
+                    desk.dataset.subject = student.subject;
+                    
+                    if (student.subject === "CS101") {
+                         desk.classList.add('conflict');
+                    }
+                } else {
+                    desk.innerHTML = `<span class="text-gray-400">Empty</span>`;
+                }
+                
+                desk.addEventListener('click', () => {
+                     if (!studentInfoBox || !integrityScoreEl || !studentInfoText) return; 
+                    studentInfoBox.classList.remove('hidden');
+                    if (student) {
+                        let explanation = `Student ${student.name} (${student.id}) placed here. Subject: ${student.subject}.`;
+                        if (desk.classList.contains('conflict')) {
+                            explanation += " <strong class='text-red-700'>Risk: Adjacent to another CS101 student.</strong>";
+                            integrityScoreEl.textContent = "91%";
+                            integrityScoreEl.classList.add('text-red-600');
+                            integrityScoreEl.classList.remove('text-green-600');
+                        } else {
+                            explanation += " <strong class='text-green-700'>OK: All adjacent students have different subjects.</strong>";
+                            integrityScoreEl.textContent = "92%";
+                            integrityScoreEl.classList.add('text-green-600');
+                            integrityScoreEl.classList.remove('text-red-600');
+                        }
+                        studentInfoText.innerHTML = explanation;
+                    } else {
+                         studentInfoText.innerHTML = "This desk is empty. No conflicts.";
+                    }
+                });
+                
+                seatingChartContainer.appendChild(desk);
+            }
+        }
+        
+        // --- 10. INITIALIZE THE APP ---
+        
+        function main() {
+            // Activate Lucide icons
+            try {
+                 if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                } else {
+                    console.warn("Lucide library not found or loaded yet.");
+                }
+            } catch (e) {
+                console.error("Lucide icons failed to initialize.", e);
+            }
+            
+            // Set up login/signup form toggles
+            if (btnShowLogin && btnShowSignup) {
+                btnShowLogin.addEventListener('click', () => toggleAuthForms(true));
+                btnShowSignup.addEventListener('click', () => toggleAuthForms(false));
+            }
+            
+            // Render the "What-If" sandbox (it's hidden but ready)
+            renderSandbox(); 
+
+            // Initialize UI states
+            updateDashboardStats();
+            populateSessionSelect();
+            checkAllFilesUploaded(); 
+            
+            console.log("App initialized. Waiting on Firebase Auth...");
+        }
+        
+        // Run the app *after* the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', main);
+
+    </script>
+</body>
+</html>
+
